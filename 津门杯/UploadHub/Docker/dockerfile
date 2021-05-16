@@ -1,0 +1,38 @@
+FROM ubuntu:14.04
+
+#ENV DEBIAN_FRONTEND noninteractive
+RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+RUN sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+
+RUN apt-get update -y
+
+# install http
+RUN apt-get install -y apache2
+RUN mkdir -p /var/lock/apache2 /var/run/apache2
+
+RUN apt-get update && apt-get install -y libapache2-mod-php5 php5 php5-mysql mysql-server python3 python3-pip
+COPY app/www /var/www/html
+COPY app/shuyu.sql /root/shuyu.sql
+COPY app/start.sh /root/start.sh
+COPY app/apache2.conf /etc/apache2/apache2.conf
+COPY app/tar.py /tar.py
+
+RUN sed -i "315c disable_functions = error_log,mb_send_mail,imap_mail,system,unlink,rmdir,shell_exec,exec,putenv,mail,pcntl_alarm,pcntl_fork,pcntl_waitpid,pcntl_wait,pcntl_wifexited,pcntl_wifstopped,pcntl_wifsignaled,pcntl_wifcontinued,pcntl_wexitstatus,pcntl_wtermsig,pcntl_wstopsig,pcntl_signal,pcntl_signal_get_handler,pcntl_signal_dispatch,pcntl_get_last_error,pcntl_strerror,pcntl_sigprocmask,pcntl_sigwaitinfo,pcntl_sigtimedwait,pcntl_exec,pcntl_getpriority,pcntl_setpriority,pcntl_async_signals,passthru,proc_open,popen,pcntl_exec,posix_mkfifo, pg_lo_import, dbmopen, dbase_open, popen, chgrp, chown, chmod, symlink,apache_setenv,define_syslog_variables, posix_getpwuid, posix_kill, posix_mkfifo, posix_setpgid, posix_setsid, posix_uname, proc_close, pclose, proc_nice, proc_terminate,curl_exec,curl_multi_exec,parse_ini_file,show_source,imap_open,imagecolormatch,fopen,copy,rename,readlink,tmpfile,tempnam,touch,link,file,ftp_connect,ftp_ssl_connect," /etc/php5/apache2/php.ini
+RUN sed -i '$a\ServerName 127.0.0.1'  /etc/apache2/apache2.conf &&\
+    chmod -R 755 /var/www/html &&\
+    chmod -R 777 /var/www/html/upload&&\
+    rm /var/www/html/index.html&&\
+    chmod +x /root/start.sh
+
+
+RUN sed -i  "N;32a\secure_file_priv=/tmp" /etc/mysql/my.cnf&&\
+    find /var/lib/mysql -type f -exec touch {} \; && service mysql start&&\
+    mysqladmin -u root password "root"&&\
+    mysql -u root -proot -e "create database shuyu;"&&\
+    mysql -u root -proot shuyu < /root/shuyu.sql
+
+RUN echo flag{e3a5fa12f003a831a9e077b9a7c46a4d}>/flag
+
+EXPOSE 80 
+
+CMD ["/root/start.sh"]
